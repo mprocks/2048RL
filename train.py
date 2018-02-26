@@ -7,12 +7,23 @@ import pygame, sys, time
 from pygame.locals import *
 from colours import *
 from random import *
+import copy
 import randbot
+import manual
+import model1
+import model2
+import model3
+import model4
 import rlbot1
+import random as rnd
+import torch
+import numpy as np
 
 TOTAL_POINTS = 0
 DEFAULT_SCORE = 2
 BOARD_SIZE = 4
+avg_score = 0
+n_moves = 0
 
 pygame.init()
 
@@ -25,13 +36,34 @@ scorefont = pygame.font.SysFont("monospace", 50)
 tileMatrix = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
 undoMat = []
 
+memory = []
+memory_size = 500
+tile_count = {}
+max_tile_count = {}
+
+def add_to_memory(old_state, move, r, new_state):
+	if(len(memory) >= memory_size):
+		memory[rnd.randint(0, 199)] = [old_state, move, r, new_state]
+	else:
+		memory.append([old_state, move, r, new_state])
+
 def move():
 	moves = ["w", "s", "a", "d"]
 	return choice(moves)
 
 def main(bot, fromLoaded = False):
+
+	'''
+		0 - up
+		1 - down
+		2 - left
+		3 - right
+	'''
+
 	global TOTAL_POINTS
 	global tileMatrix
+	global avg_score
+	global n_moves
 
 	if not fromLoaded:
 		placeRandomTile()
@@ -40,13 +72,16 @@ def main(bot, fromLoaded = False):
 	printMatrix()
 
 	while True:
-		event = bot.move(tileMatrix, TOTAL_POINTS)
 		# for event in pygame.event.get():
-			# if event.type == QUIT:
-			# 	pygame.quit()
-			# 	sys.exit()
+		# 	if event.type == QUIT:
+		# 		pygame.quit()
+		# 		sys.exit()
 
 		if checkIfCanGo() == True:
+			old_state = copy.deepcopy(tileMatrix)
+			old_score = TOTAL_POINTS
+			n_moves += 1
+			event = bot.move(tileMatrix, TOTAL_POINTS)
 			# if event == "s":
 				# if isArrow(event.key):
 			rotations = getRotations(event)
@@ -60,14 +95,24 @@ def main(bot, fromLoaded = False):
 				moveTiles()
 				mergeTiles()
 				placeRandomTile()
+			else:
+				print("Invalid")
 
 			for j in range(0, (4 - rotations) % 4):
 				rotateMatrixClockwise()
-
+			if(TOTAL_POINTS - old_score > 250):
+				add_to_memory(old_state, event, (TOTAL_POINTS - old_score)/10, tileMatrix)
+			else:
+				add_to_memory(old_state, event, 0, tileMatrix)
 			printMatrix()
 		else:
+			# add_to_memory(old_state, event, -TOTAL_POINTS/100, -1)
+			add_to_memory(old_state, event, -10, -1)
+			# add_to_memory(old_state, event, 0, -1)
+			avg_score += TOTAL_POINTS
 			printGameOver()
 			reset(bot)
+			break
 
 			# if event.type == KEYDOWN:
 			# 	global BOARD_SIZE
@@ -89,7 +134,7 @@ def main(bot, fromLoaded = False):
 		pygame.display.update()
 
 def printMatrix():
-
+	pass
 	SURFACE.fill(BLACK)
 
 	global BOARD_SIZE
@@ -156,6 +201,7 @@ def mergeTiles():
 					moveTiles()
 
 def checkIfCanGo():
+	# print("IN CHECK", tileMatrix)
 	for i in range(0, BOARD_SIZE ** 2):
 		if tileMatrix[floor(i / BOARD_SIZE)][i % BOARD_SIZE] == 0:
 			return True
@@ -171,6 +217,8 @@ def checkIfCanGo():
 def reset(bot):
 	global TOTAL_POINTS
 	global tileMatrix
+	global n_moves
+	global max_tile_count
 
 	f = open("log.txt", "a")
 
@@ -178,14 +226,30 @@ def reset(bot):
 	f.write(str(max(max(tileMatrix))))
 	f.write("\n")
 
+	print("Number of moves: ", n_moves)
+
 	TOTAL_POINTS = 0
+	n_moves = 0
 	SURFACE.fill(BLACK)
+	max_tile = max(max(tileMatrix))
+
+	for i in tileMatrix:
+		for j in i:
+			if j in tile_count.keys():
+				# temp_dict[j] += 1
+				tile_count[j] += 1
+			else:
+				max_tile_count[j] = 0
+				tile_count[j] = 1
+
+	max_tile_count[max_tile] += 1
 
 	tileMatrix = [[0 for i in range(0, BOARD_SIZE)] for j in range(0, BOARD_SIZE)]
 
-	main(bot)
+	# main(bot)
 
 def canMove():
+	# print("TITLE : ", tileMatrix)
 	for i in range(0, BOARD_SIZE):
 		for j in range(1, BOARD_SIZE):
 			if tileMatrix[i][j-1] == 0 and tileMatrix[i][j] > 0:
@@ -274,5 +338,75 @@ def undo():
 
 		printMatrix()
 
-bot = rlbot1.bot()
-main(bot)
+def mse_loss(input, target):
+    return torch.sum((input - target)**2)
+
+def train_bot(net, learning_rate):
+	rnd.shuffle(memory)
+	# loss = mse_loss()
+	optimizer = torch.optim.Adam(net.parameters(), lr = learning_rate)
+	gamma = 0.9
+	for i in memory:
+
+		old_state = np.asarray(i[0])
+		optimizer.zero_grad()
+		x1 = old_state.flatten()
+		x1 = torch.from_numpy(x1).type(torch.FloatTensor).cuda()
+		x1 = x1.view(1,1,4,4) # add this for convnets
+		x1 = torch.autograd.Variable(x1)
+
+		r = i[2]
+
+		move = i[1]
+
+		if(i[3] != -1):
+			new_state = np.asarray(i[3])
+
+			x2 = new_state.flatten()
+			x2 = torch.from_numpy(x2).type(torch.FloatTensor).cuda()
+			x2 = x2.view(1,1,4,4)	# add this for convnets
+			x2 = torch.autograd.Variable(x2)
+
+			out2 = net.forward(x2).cuda()
+			val = r + gamma*torch.max(out2)
+
+		else:
+			val = r
+
+		out1 = net.forward(x1).cuda()
+		
+		# print(r, out1.data)
+
+		target1 = out1.clone()
+		target1[move] = val
+
+		target1.clamp(min=-10, max=10)
+
+		outloss = mse_loss(target1, out1)
+		outloss.backward()
+		optimizer.step()
+
+
+# net = model1.Model().cuda()
+net = model4.Model().cuda()
+# bot = randbot.bot()
+# net = torch.load("epoch_lr-5_rnd0.2950.pt")
+net = torch.load("good_initialization.pt")
+bot = rlbot1.bot(net, 0)
+ngames = 1000
+running_avg = [0 for i in range(ngames)]
+for i in range(0, ngames):
+	main(bot)
+	running_avg[i] = avg_score
+	# print("average score: ", (avg_score - running_avg[max(i-10, 0)])/(min(i+1, 10)))
+	print("average score: ", avg_score/(i+1))
+	print("number of games: ", i+1)
+	print("Tile Counts: ")
+	# for key, value in sorted(tile_count.items()):
+	# 	print(key, value)
+	for key, value in sorted(max_tile_count.items()):
+		print(key, value)
+
+	# train_bot(net, 0.001)
+	# if i%50 == 0:
+	# 	torch.save(net, 'newreward' + str(i) + '.pt')

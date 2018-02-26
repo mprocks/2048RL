@@ -1,0 +1,15 @@
+Report
+
+Random:
+	games: 250
+	tiles:
+		128: 137 -> 54.8%
+		256: 28 -> 11.2%
+		512: 0 -> usually 0.1%
+
+10 layer FC network with randomization:
+	games: 246
+	tiles:
+		128: 229 -> 93.09%
+		256: 142 -> 57.72%
+		512: 10 -> 4%

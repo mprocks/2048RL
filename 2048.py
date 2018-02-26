@@ -8,6 +8,7 @@ from pygame.locals import *
 from colours import *
 from random import *
 import randbot
+import manual
 import rlbot1
 
 TOTAL_POINTS = 0
@@ -30,6 +31,14 @@ def move():
 	return choice(moves)
 
 def main(bot, fromLoaded = False):
+
+	'''
+		0 - up
+		1 - down
+		2 - left
+		3 - right
+	'''
+
 	global TOTAL_POINTS
 	global tileMatrix
 
@@ -40,13 +49,13 @@ def main(bot, fromLoaded = False):
 	printMatrix()
 
 	while True:
-		event = bot.move(tileMatrix, TOTAL_POINTS)
 		# for event in pygame.event.get():
-			# if event.type == QUIT:
-			# 	pygame.quit()
-			# 	sys.exit()
+		# 	if event.type == QUIT:
+		# 		pygame.quit()
+		# 		sys.exit()
 
 		if checkIfCanGo() == True:
+			event = bot.move(tileMatrix, TOTAL_POINTS)
 			# if event == "s":
 				# if isArrow(event.key):
 			rotations = getRotations(event)
@@ -60,6 +69,8 @@ def main(bot, fromLoaded = False):
 				moveTiles()
 				mergeTiles()
 				placeRandomTile()
+			else:
+				print("Invalid")
 
 			for j in range(0, (4 - rotations) % 4):
 				rotateMatrixClockwise()
@@ -156,6 +167,7 @@ def mergeTiles():
 					moveTiles()
 
 def checkIfCanGo():
+	# print("IN CHECK", tileMatrix)
 	for i in range(0, BOARD_SIZE ** 2):
 		if tileMatrix[floor(i / BOARD_SIZE)][i % BOARD_SIZE] == 0:
 			return True
@@ -186,6 +198,7 @@ def reset(bot):
 	main(bot)
 
 def canMove():
+	# print("TITLE : ", tileMatrix)
 	for i in range(0, BOARD_SIZE):
 		for j in range(1, BOARD_SIZE):
 			if tileMatrix[i][j-1] == 0 and tileMatrix[i][j] > 0:
