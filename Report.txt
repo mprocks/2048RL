@@ -13,3 +13,10 @@ Random:
 		128: 229 -> 93.09%
 		256: 142 -> 57.72%
 		512: 10 -> 4%
+
+5 layer CNN:
+	initialization: avg. score ~= 2700
+
+expectimax bot best: 
+	score: 56736
+	tiles: 1 4096 and 1 1024

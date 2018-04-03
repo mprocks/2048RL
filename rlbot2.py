@@ -3,6 +3,7 @@ import torch
 import copy
 from torch.autograd import Variable
 import numpy as np
+import time
 
 class bot:
 	def __init__(self, net, randomization):
@@ -54,11 +55,16 @@ class bot:
 			return False
 
 	def move(self, board, score):
+		newboard = np.zeros([16, 4, 4])
+		for i in range(16):
+			if i == 0:
+				newboard[i][np.where(board == 0)] = 1
+			else:
+				newboard[i][np.where(board == 2**i)] = 1
 		board = np.array(board)
 		board = np.log2(board+0.5).astype(int)
-		x = board.flatten()
-		x = torch.from_numpy(x).type(torch.FloatTensor).cuda()
-		x = x.view(1,1,4,4) # add this for convnets
+		x = torch.from_numpy(newboard).type(torch.FloatTensor).cuda()
+		x = x.view(1,16,4,4) # add this for convnets
 		x = Variable(x)
 		# print("x = ", x)
 		out = self.net.forward(x).cuda()
@@ -76,4 +82,7 @@ class bot:
 		else:
 			final_move = movelist[0]
 		# print(final_move)
+		# time.sleep(0.05)
 		return final_move
+
+		#initial 2100
